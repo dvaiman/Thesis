@@ -1,0 +1,313 @@
+---
+title: "physicalworkload"
+author: "Daniel Väisänen"
+date: "2022-10-29"
+output: html_document
+---
+############################
+# Cox analyses for the association between physical workload and CVD moderated by sex 
+############################
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+
+
+
+library(tidyverse)
+library(survival)
+library(survminer)
+#library(tidycat)
+#library(AF)
+
+theme_set(theme_minimal(base_family = "Roboto"))
+
+theme_update()
+```
+
+Read data
+```{r}
+df_sl_pat_dor2 <- read_csv("../../../Paper 4/data/hpb1_sl_pat_dor_2021-11-32.csv", locale = readr::locale(encoding = "UTF-8"))
+
+# encoding = "latin-1"
+```
+
+
+
+```{r}
+
+
+df <- df_sl_pat_dor2 %>% 
+    filter(Age >= 18 | Age <= 75) %>% 
+  mutate(Ssyk_hpi_scb_wb_hl = fct_relevel(Ssyk_hpi_scb_wb_hl, 
+                                                   "White-collar high-skilled", 
+                                                   "White-collar low-skilled",
+                                                   "Blue-collar high-skilled", 
+                                                   "Blue-collar low-skilled"),
+                  
+                    PhysicalWorkSituation = case_when(
+                      PhysicalWorkSituation == "Periodvis mycket fysiskt krävande arbete" ~ "Occasionally very physically demanding", 
+                      PhysicalWorkSituation == "Rörligt arbete" ~ "Physically active",
+                      PhysicalWorkSituation == "Stillasittande med inslag av rörligt arbete" ~ "Sitting with some movement",
+                      PhysicalWorkSituation == "Periodvis fysiskt krävande arbete" ~ "Occasionally physically demanding",
+                      TRUE ~ PhysicalWorkSituation),
+           PhysicalWorkSituation = fct_relevel(PhysicalWorkSituation, 
+                                                  "Sitting with some movement", 
+                                                 "Physically active",
+                                                  "Occasionally physically demanding", 
+                                                  "Occasionally very physically demanding"),
+                    TobaccoSmoking = as.factor(TobaccoSmoking),
+                    PhysicalWorkSituation = as.factor(PhysicalWorkSituation),
+                    Gender = as.factor(Gender),
+                    Ssyk12_hpi_scb_combined = as.factor(Ssyk12_hpi_scb_combined),
+                    SUN2000Niva_Old = as.factor(SUN2000Niva_Old),
+                    pat_time = if_else(pat_time < 0, NA_real_, pat_time),
+                   Ssyk12_name = as.factor(Ssyk12_name),
+                   physicalworksituation_cat = fct_relevel(physicalworksituation_cat, "Sedentary work","Demanding work"),
+                   physicalworksituation_cat2 = fct_relevel(physicalworksituation_cat2, "Sedentary work","Demanding work"),
+                   Education = fct_relevel(Education, "high", "middle", "low"),
+                   TobaccoSmoking_cat = as.factor(TobaccoSmoking_cat),
+                   meanarterialpressure_cat = as.factor(meanarterialpressure_cat),
+                   Health_cat = as.factor(Health_cat),
+                   BMI_cat = as.factor(BMI_cat),
+                   StressOverall_cat = as.factor(StressOverall_cat),
+                   SedentaryWork_cat = as.factor(SedentaryWork_cat),
+                   bloodpres_cat = as.factor(bloodpres_cat),
+                   Diet_cat = as.factor(Diet_cat),
+                   SedentarySparetime_cat = as.factor(SedentarySparetime_cat),
+                   age_at_exit = Age + pat_time/365.24,
+                   Astrand_Lm2 = Astrand_MaxVO2/(HeightCM/100)^2,
+                  Ssyk_wb =  if_else(Ssyk_hpi_scb_wb_hl == "White-collar high-skilled", 
+                                     "White-collar high-skilled", 
+                                     "Blue-collar and low-skilled"),
+                  Ssyk_wb = as.factor(Ssyk_wb),
+                                     Ssyk_wb = relevel(Ssyk_wb, ref = "White-collar high-skilled") ,
+                  alcohol_bin = case_when( AlcoholTotalScore <= 4 & Gender == "Female" ~ "low risk",
+                    AlcoholTotalScore <= 5 & Gender == "Male" ~ "low risk",
+                    AlcoholTotalScore >= 5 & Gender == "Female" ~ "High risk",
+                    AlcoholTotalScore >= 6 & Gender == "Male" ~ "High risk",
+                    Alcohol <= 3 ~ "Low risk",
+                    Alcohol >= 4 ~ "High risk",
+                    TRUE ~ NA_character_),
+                  Exercise_cat = if_else(Exercise <=2,1,0),
+         calendar_time = 2019 - lubridate::year(Performed)
+) %>% 
+  drop_na(Age, 
+          Gender, 
+          Astrand_rel_VO2, 
+          Ssyk_hpi_scb_wb_hl, 
+          pat_time,
+          physicalworksituation_cat, 
+                          Astrand_Lm2,
+                          TobaccoSmoking_cat,
+                          BMI,
+                          Diet,
+                          Exercise) %>% 
+  filter(pat_event_before != 1) %>% 
+  filter(pat_time > 365*2 | !pat_event_after == 1)
+
+#  df %>%  skimr::skim()
+#  
+#  df <- df %>% 
+#  mutate(
+#  Gender = fct_relevel(Gender,  "Male", "Female"),
+#  )
+#  levels(df$Gender)
+#  relevel(b, ref = 3)
+
+
+#df %>% mutate(diff = age_at_exit - Age) %>% select(diff , age_at_exit , Age, pat_time) %>%  view()
+```
+
+
+
+```{r}
+m1a <- coxph(Surv(pat_time, pat_event_after) ~ PhysicalWorkSituation *  Gender + Age + calendar_time, data = df)
+m1b <-  coxph(Surv(pat_time, pat_event_after) ~ PhysicalWorkSituation * Gender + Age + calendar_time + Education, data = df)
+m1c <- coxph(Surv(pat_time, pat_event_after) ~ PhysicalWorkSituation * Gender + Age + Astrand_rel_VO2 + TobaccoSmoking_cat + BMI + Diet + Exercise + calendar_time + StressOverall + Education, data = df)
+m1d <- coxph(Surv(pat_time, pat_event_after) ~ PhysicalWorkSituation * Gender + Age + Astrand_rel_VO2  + TobaccoSmoking_cat + BMI + Diet + Exercise + calendar_time  + StressOverall + Education + bloodpres_cat , data = df)
+
+
+
+
+df_grouped <- 
+bind_rows(
+m1a |> sjPlot::get_model_data(type = "pred", terms = c("PhysicalWorkSituation", "Gender")) |> 
+  as.data.frame() |> 
+  mutate(PhysicalWorkSituation = case_when(
+                      x == 4 ~ "Occasionally very physically demanding", 
+                      x == 2 ~ "Physically active",
+                      x == 1 ~ "Sitting with some movement",
+                      x == 3 ~ "Occasionally physically demanding"),
+         Model = "1 Age"),
+
+m1b |> sjPlot::get_model_data(type = "pred", terms = c("PhysicalWorkSituation", "Gender")) |> 
+  as.data.frame() |> 
+  mutate(PhysicalWorkSituation = case_when(
+                      x == 4 ~ "Occasionally very physically demanding", 
+                      x == 2 ~ "Physically active",
+                      x == 1 ~ "Sitting with some movement",
+                      x == 3 ~ "Occasionally physically demanding"),
+         Model = "2 + Education"),
+m1d |> sjPlot::get_model_data(type = "pred", terms = c("PhysicalWorkSituation", "Gender")) |> 
+  as.data.frame() |> 
+  mutate(PhysicalWorkSituation = case_when(
+                      x == 4 ~ "Occasionally very physically demanding", 
+                      x == 2 ~ "Physically active",
+                      x == 1 ~ "Sitting with some movement",
+                      x == 3 ~ "Occasionally physically demanding"),
+         Model = "3 + CRF, smoking, BMI, diet, Exercise, overall stress"),
+m1d |> sjPlot::get_model_data(type = "pred", terms = c("PhysicalWorkSituation", "Gender")) |> 
+  as.data.frame() |> 
+  mutate(PhysicalWorkSituation = case_when(
+                      x == 4 ~ "Occasionally very physically demanding", 
+                      x == 2 ~ "Physically active",
+                      x == 1 ~ "Sitting with some movement",
+                      x == 3 ~ "Occasionally physically demanding"),
+         Model = "4 + Bloodpressure"),
+)
+
+
+
+
+
+df_grouped |> 
+  mutate(Model = as.factor(Model),
+         #Model = fct_rev(Model),
+                    PhysicalWorkSituation = fct_relevel(PhysicalWorkSituation, 
+                                                  "Sitting with some movement", 
+                                                 "Physically active",
+                                                  "Occasionally physically demanding", 
+                                                  "Occasionally very physically demanding")) |> 
+     ggplot() +
+  geom_vline(xintercept = 1) +
+  geom_vline(aes(xintercept = predicted), color = if_else(df_grouped$PhysicalWorkSituation=="Sitting with some movement", "grey", "transparent")) +
+  geom_pointrange(aes(x = predicted, y = PhysicalWorkSituation, xmin = conf.low, xmax = conf.high, color = group), position = position_dodge(.5)) +
+  scale_y_discrete(limits=rev) + # 
+  scale_x_log10(breaks= c(.8, 1, 1.4, 2.7, 3.2)) +
+  facet_wrap(~ Model, ncol = 1) +
+  theme(legend.position = "top") +
+  labs(title = "Cox model of physical worksituation and incident CVD moderated by sex", x = "HR (95%CI)", y = "") +
+  paletteer::scale_colour_paletteer_d("wesanderson::Moonrise2", 1, 
+                                      guide = guide_legend(reverse = TRUE) )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+rbind(
+m1a %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>% filter(str_detect(term, "^PhysicalWork")) %>% mutate(m = "1 Age and sex"),
+m1b %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>% filter(str_detect(term, "^PhysicalWork")) %>% mutate(m = "2 + Education"),
+m1c %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>% filter(str_detect(term, "^PhysicalWork"))  %>% mutate(m = "3 + Mediating variables"),
+m1d %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>% filter(str_detect(term, "^PhysicalWork")) %>% mutate(m = "4 + All")
+) %>% 
+  ggplot() +
+  geom_vline(xintercept = 1) +
+  geom_pointrange(aes(x = estimate, y = term, xmin = conf.low, xmax = conf.high, color = m), position = position_dodge(.5)) +
+  scale_y_discrete(limits=rev) +
+  scale_x_log10(breaks= c(.8, 1, 1.4)) +
+  theme(legend.position = "right") +
+  paletteer::scale_colour_paletteer_d("wesanderson::Moonrise2", -1)
+```
+
+
+
+
+
+```{r}
+
+
+# function for reference values plotting
+reference_val <- function(df, m,  ...) {
+  df %>% 
+    bind_rows(
+    data.frame(
+    level = "2.4 Other professionals",
+    m = {{m}},
+    estimate = 1,
+    conf.low = 1,
+    conf.high = 1,
+    label = "1 (Reference)"
+)
+  )
+}
+  # events and cases
+count_data <- df %>% group_by(PhysicalWorkSituation) %>% 
+  summarise(Event = sum(pat_event_after), Count = n())
+
+plotframe <- bind_rows(
+  m1a %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE)%>%
+    filter(str_detect(term, "^PhysicalWork")) %>% 
+    separate(term, c("variable", "level"), sep = "name", remove = FALSE) %>% 
+   # reference_val(level = "White-collar high-skilled") %>% 
+    mutate(m = "Model 1. Age, sex and calendar time"),
+  m1b %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>% 
+    filter(str_detect(term, "^PhysicalWork")) %>% 
+    separate(term, c("variable", "level"), sep = "name", remove = FALSE) %>% 
+  #  reference_val(level = "White-collar high-skilled") %>% 
+    mutate(m = "Model 2. + Education"),
+  m1c %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>%
+    filter(str_detect(term, "^PhysicalWork")) %>% 
+    separate(term, c("variable", "level"), sep = "name", remove = FALSE) %>% 
+   # reference_val(level = "White-collar high-skilled") %>% 
+    mutate(m = "Model 3. + Mediating variables"), 
+  m1d %>%  broom::tidy(exponentiate = TRUE, conf.int = TRUE) %>% 
+    filter(str_detect(term, "^PhysicalWork")) %>% 
+    separate(term, c("variable", "level"), sep = "name", remove = FALSE) %>% 
+    #  reference_val(level = "White-collar high-skilled") %>% 
+    mutate(m = "Model 4. + All") 
+) %>%  
+  mutate(label = glue::glue('{sprintf("%2.2f", estimate)} ({sprintf("%2.2f", conf.low)}-{sprintf("%2.2f", conf.high)})')) %>% #str_c 
+  
+  reference_val(m = "Model 1. Age, sex and calendar time") %>% 
+  reference_val(m = "Model 2. + Education") %>% 
+  reference_val(m = "Model 3. + Mediating variables") %>% 
+  reference_val(m = "Model 4. + All") %>% 
+  left_join(
+    m1a$xlevels$PhysicalWorkSituation  %>% 
+      enframe(), by = c("level" = "value") 
+  ) %>% 
+  mutate(
+    name = ifelse(name == 1, 5.5, name), # placemetn of reference level
+    level= fct_reorder(level, name),
+    wbhl = case_when(name >= 1 & name <= 6 ~ "White-collar high-skilled",
+                   name >= 6 & name <= 8 ~ "White-collar low-skilled",
+                   name >= 9 & name <= 10 ~ "Blue-collar high-skilled",
+                   name >= 11 & name <= 13 ~ "Blue-collar low-skilled"),
+    hl = case_when(name >= 1 & name <= 8 ~ "White-collar high-skilled",
+                   name >= 9 & name <= 13 ~ "Blue-collar and low-skilled")
+  )
+
+
+
+
+plotframe |> 
+    ggplot() +
+  geom_vline(xintercept = 1) +
+  geom_pointrange(aes(x = estimate, y = term, xmin = conf.low, xmax = conf.high, color = m), position = position_dodge(.5)) +
+  scale_y_discrete(limits=rev) +
+  scale_x_log10(breaks= c(.8, 1, 1.4)) +
+  theme(legend.position = "right") +
+  paletteer::scale_colour_paletteer_d("wesanderson::Moonrise2", -1)
+```
+
+
+
+
+
+```{r}
+df |> 
+  ggplot(aes(Ssyk12_hpi_scb_combined, BMI, color = Gender)) +
+geom_path(position = position_jitter(), alpha = 0.1) +
+  coord_polar()
+```
+
