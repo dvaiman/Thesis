@@ -1,0 +1,243 @@
+---
+title: "Thesis_frontpage_plot"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(ggraph)
+library(tidygraph)
+library(geomtextpath)
+```
+
+```{r}
+
+df_sl_pat_dor2 <- read_csv("../../../Paper 4/data/hpb1_sl_pat_dor_2021-11-32.csv", 
+                           locale = readr::locale(encoding = "UTF-8"))
+```
+
+# set theme
+
+```{r}
+
+theme_set(theme_classic())
+
+theme_update(
+    text = element_text(
+        family = "Lora"), #Lora
+    plot.background = element_rect(fill = "#80afcd", color = "#80afcd"),
+    panel.background = element_rect(fill = "#80afcd", color = "#80afcd"),
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank()
+  )
+
+```
+
+
+# Aggregating and summarizing data for plotting
+
+```{r}
+df <- df_sl_pat_dor2 |> 
+  group_by(Ssyk2_hpi_scb_combined, Ssyk12_hpi_scb_combined,Ssyk_hpi_scb_wb_hl) |> 
+  summarise(maxBMI = max(BMI), minBMI = min(BMI), BMI = mean(BMI),  
+            maxCRF = max(Astrand_rel_VO2), minCRF = min(Astrand_rel_VO2), CRF = mean(Astrand_rel_VO2), 
+            maxAge = max(Age), minAge = min(Age), Age = mean(Age),
+            smoking = mean(TobaccoSmoking),
+            n = n()/1000) 
+```
+
+
+Numeric version
+
+```{r}
+df |> 
+  bind_rows(data.frame(Ssyk2_hpi_scb_combined = c(97,98,99,5,10))) |> 
+  #mutate(Ssyk2_hpi_scb_combined = as.factor(Ssyk2_hpi_scb_combined)) |> 
+  ggplot(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
+#  geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), fill="gold", alpha=0.3) +
+ # geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxAge), fill="indianred", alpha=0.3) +
+ # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), width = 0.1, fill="black", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
+#  geom_path(aes(x=Ssyk2_hpi_scb_combined , y=Age), color="gold", alpha=0.3) +
+#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=CRF), color="gold", alpha=0.3) +
+#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=BMI), color="gold4", alpha=0.9) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=CRF), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=smoking), fill="gold4", alpha=0.9) +
+    # placeholder
+  #geom_line(aes(x=Ssyk12_hpi_scb_combined , y=n), color="transparent", fill = "transparent", alpha=0.9) +
+  geom_text(aes(y=50, label = Ssyk2_hpi_scb_combined), color = "transparent") +
+  scale_x_continuous(breaks = c(13,24, 33,43,53,62,74,82,93),
+                     labels = c("I","II", "III","VI","V","VI","VII","VIII","XI")
+                     ) +
+  ylim(-5,50) +
+  geomtextpath::coord_curvedpolar() 
+```
+
+factor version
+
+```{r}
+df |> 
+  bind_rows(data.frame(Ssyk2_hpi_scb_combined = c(97,98,99,5,10))) |> 
+  mutate(Ssyk2_hpi_scb_combined = as.factor(Ssyk2_hpi_scb_combined),
+         Ssyk2_hpi_scb_combined = fct_infreq(Ssyk2_hpi_scb_combined)) |> 
+  group_by(Ssyk1_hpi_scb_combined) |> 
+  mutate(Ssyk2_hpi_scb_combined= fct_reorder(Ssyk2_hpi_scb_combined, Age)) |> 
+  ggplot(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
+#  geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), fill="gold", alpha=0.3) +
+ # geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxAge), fill="indianred", alpha=0.3) +
+ # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), width = 0.1, fill="black", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
+#  geom_path(aes(x=Ssyk2_hpi_scb_combined , y=Age), color="gold", alpha=0.3) +
+#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=CRF), color="gold", alpha=0.3) +
+#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=BMI), color="gold4", alpha=0.9) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=CRF), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=smoking), fill="gold4", alpha=0.9) +
+    # placeholder
+  #geom_line(aes(x=Ssyk12_hpi_scb_combined , y=n), color="transparent", fill = "transparent", alpha=0.9) +
+  geom_text(aes(y=50, label = Ssyk2_hpi_scb_combined)) +
+  #scale_x_continuous(breaks = c(13,24, 33,43,53,62,74,82,93),
+  #                   labels = c("I","II", "III","VI","V","VI","VII","VIII","XI")
+  #                   ) +
+  geomtextpath::coord_curvedpolar() 
+
+
+```
+
+
+
+
+```{r}
+df |> 
+  bind_rows(data.frame(Ssyk2_hpi_scb_combined = c(97,98,99,5,10))) |> 
+  mutate(Ssyk2_hpi_scb_combined = as.factor(Ssyk2_hpi_scb_combined)) |> 
+  ggplot(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
+      geom_segment(aes(x = Ssyk2_hpi_scb_combined,
+                   xend = Ssyk2_hpi_scb_combined,
+                   y = 50,
+                   yend = 80),
+               linetype = "dotted") +
+#  geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), fill="gold", alpha=0.3) +
+ # geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxAge), fill="indianred", alpha=0.3) +
+ # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), width = 0.1, fill="black", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
+#  geom_path(aes(x=Ssyk2_hpi_scb_combined , y=Age), color="gold", alpha=0.3) +
+#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=CRF), color="gold", alpha=0.3) +
+#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=BMI), color="gold4", alpha=0.9) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=CRF), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=smoking), fill="gold4", alpha=0.9) +
+    # placeholder
+  #geom_line(aes(x=Ssyk12_hpi_scb_combined , y=n), color="transparent", fill = "transparent", alpha=0.9) +
+  geom_text(aes(y=50, label = Ssyk2_hpi_scb_combined)) +
+  #scale_x_continuous(breaks = c(13,24, 33,43,53,62,74,82,93),
+  #                   labels = c("I","II", "III","VI","V","VI","VII","VIII","XI")
+  #                   ) +
+  # horizontal segment
+  geom_segment(aes(x = 0,
+                   xend = 45,
+                   y = 0,
+                   yend = 0)) +
+
+  geomtextpath::coord_curvedpolar() +
+  ylim(-10,90)
+
+```
+
+
+
+possible colorscale: ggpomodoro
+
+
+
+
+
+
+# Other ideas
+https://github.com/z3tt/TidyTuesday/blob/main/R/2020_22_Cocktails.Rmd
+
+
+# PCA
+
+https://bjnnowak.netlify.app/2021/09/15/r-pca-with-tidyverse/
+
+
+
+Plot 1
+
+```{r}
+graph <- as_tbl_graph(df_sl_pat_dor2 |> slice_head(n = 1500) |> 
+                        select(BMI, LopNr, Ssyk12_name)) %>% 
+    mutate(BMI = centrality_degree(mode = 'in'))
+
+graph |> 
+ggraph(layout = 'linear', circular = TRUE) + 
+    geom_edge_fan(aes(alpha = after_stat(index), color = Ssyk12_name), show.legend = FALSE) +
+  geom_node_tile(aes(width = BMI, height = BMI)) +
+scale_edge_colour_brewer(
+  type = "seq",
+  palette = 7,
+  direction = 1,
+  aesthetics = "edge_colour"
+)
+
+```
+
+Plot 2
+
+```{r}
+ggraph(graph, 'partition', circular = TRUE) + 
+  geom_node_arc_bar(aes(fill = BMI), size = 0.25) + 
+  coord_fixed()
+```
+
+Treemap
+
+```{r}
+ggraph(graph, 'treemap', weight = BMI) + 
+  geom_node_tile(aes(fill = BMI), size = 0.25)
+```
+
+```{r}
+
+dendrogram <- hclust(dist(df_sl_pat_dor2 |> slice_head(n = 1000) |> select(Ssyk12_hpi_scb_combined, BMI, Astrand_rel_VO2)))
+
+
+ggraph(dendrogram, 'dendrogram', height = height) + 
+  geom_edge_elbow()
+
+
+ggraph(dendrogram, 'dendrogram', circular = TRUE) + 
+  geom_edge_elbow(aes(colour = Ssyk12_hpi_scb_combined)) + 
+  coord_fixed()
+```
+
+```{r}
+
+
+
+
+graph <- as_tbl_graph(df_sl_pat_dor2 |> slice_head(n = 1000) |> select(BMI, LopNr, Ssyk12_name)) %>% 
+    mutate(BMI = centrality_degree(mode = 'in'))
+```
+
+```{r}
+
+graph |> 
+ggraph(layout = 'linear', circular = TRUE) + 
+    geom_edge_fan(aes(alpha = after_stat(index), color = Ssyk12_name), show.legend = FALSE) + 
+  geom_node_tile(aes(width = BMI, height = BMI))
+    geom_node_point(aes(size = BMI))
+
+
+  facet_edges(~year) + 
+    theme_graph(foreground = 'steelblue', fg_text_colour = 'white')
+  
+  ggsave(here::here("accidentalart.svg"))
+```
