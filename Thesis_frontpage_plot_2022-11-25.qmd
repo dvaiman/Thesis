@@ -42,6 +42,7 @@ theme_update(
 
 ```{r}
 df <- df_sl_pat_dor2 |> 
+  mutate(sex = if_else(Gender == "Female",1,0)) |> 
   group_by(Ssyk2_hpi_scb_combined, 
            Ssyk12_hpi_scb_combined,
            Ssyk_hpi_scb_wb_hl,
@@ -51,7 +52,8 @@ df <- df_sl_pat_dor2 |>
             maxCRF = max(Astrand_rel_VO2), minCRF = min(Astrand_rel_VO2), CRF = mean(Astrand_rel_VO2), 
             maxAge = max(Age), minAge = min(Age), Age = mean(Age),
             smoking = mean(TobaccoSmoking),
-            n = n()/1000) |> 
+            sex = mean(sex)*100,
+            n = n()/100) |> 
   mutate(ssyk1_name = case_when(
     Ssyk1_hpi_scb_combined == 2 ~ "2 Professionals",
                    Ssyk1_hpi_scb_combined == 8 ~ "8 Transport and mechanical manufacturing",
@@ -65,31 +67,65 @@ df <- df_sl_pat_dor2 |>
     data.frame(
     x = c(1, 22, 32, 42),
     xend = c(20,30,40,50),
-    y = c(88, 88, 88, 88),
-    yend = c(88, 88, 88, 88),
+    y =    rep(88,4), 
+    yend = rep(88,4), 
     label = c("White-collar high-skilled", 
               "White-collar low-skilled", 
               "Blue-collar high-skilled", 
-              "Blue-collar low-skilled")
-  )
+              "Blue-collar low-skilled"),
+    y2 = rep(78,4), 
+    yend2 = rep(78,4) 
+  ) |> 
+    left_join(
+      df_sl_pat_dor2 |> 
+        mutate(sex = if_else(Gender == "Female",1,0),
+               education = SUN2000Niva_Old <= 4, 1,0) |> 
+        group_by(Ssyk_hpi_scb_wb_hl) |> 
+        summarise(sex = mean(sex),
+                  education = mean(education)),
+      by = c("label" = "Ssyk_hpi_scb_wb_hl")
+      ) |> 
+    mutate(diff = xend-x,
+           diff_attributed_to_women = diff*sex,
+           xend2_sex = x+diff_attributed_to_women,
+           diff_attributed_to_education = diff*education,
+           xend2_edu = x+diff_attributed_to_education)
+  
+  
+  # data for aggregating more lines
+  df_sl_pat_dor2 |> 
+    mutate(sex = if_else(Gender == "Female",1,0)) |> 
+    group_by(Ssyk1_hpi_scb_combined) |> 
+    summarise(sex = mean(sex)*100) 
+  
+  
+  df |> 
+    group_by(Ssyk1_hpi_scb_combined) |> 
+    summarise(sex = mean(sex))
 ```
+seeing
+imagining
+acting
+describing
 
 
 ```{r}
 df |> 
+  # space between bars
   bind_rows(
     data.frame(Ssyk2_hpi_scb_combined = c(18,27,36,45, 55,63, 77, 84,97),
-                       lines = as.factor(c(18,27,36,45, 55,63, 77, 84,97))
-               ),
-                       data.frame(lines2 = as.factor(c(36, 55, 77,97))
-                                         )) |> 
+               lines = as.factor(c(18,27,36,45, 55,63, 77, 84,97))
+    ),
+    data.frame(lines2 = as.factor(c(36, 55, 77,97))
+    )) |> 
   mutate(Ssyk2_hpi_scb_combined = as.factor(Ssyk2_hpi_scb_combined)) |> 
+  # plot
   ggplot(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) +
   geom_point(aes(x=lines2, y=108), 
              shape = 24,
              size=4,
              #position = position_nudge(0,5)
-             ) +
+  ) +
   geom_segment(aes(x = lines,
                    xend = lines,
                    y = 40,
@@ -103,56 +139,77 @@ df |>
                linetype = "dotted",
                color = "black",
                arrow = arrow(length = unit(0.03, "npc"))
-               )+
-#  geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), fill="gold", alpha=0.3) +
- # geom_polygon(aes(x=Ssyk2_hpi_scb_combined , y=maxAge), fill="indianred", alpha=0.3) +
- # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=maxBMI), width = 0.1, fill="black", alpha=0.3) +
+  )+
   geom_col(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) + 
-
-#  geom_path(aes(x=Ssyk2_hpi_scb_combined , y=Age), color="gold", alpha=0.3) +
-#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=CRF), color="gold", alpha=0.3) +
-#  geom_line(aes(x=Ssyk2_hpi_scb_combined , y=BMI), color="gold4", alpha=0.9) +
   geom_col(aes(x=Ssyk2_hpi_scb_combined , y=CRF), fill="gold", alpha=0.3) +
   geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
   geom_col(aes(x=Ssyk2_hpi_scb_combined , y=smoking), fill="gold4", alpha=0.9) +
-    # placeholder
-  #geom_line(aes(x=Ssyk12_hpi_scb_combined , y=n), color="transparent", fill = "transparent", alpha=0.9) +
   geomtextpath::geom_textpath(aes(y=98, label = Ssyk2_hpi_scb_combined), color = "black") +
   geom_text(aes(x="97",y=115, label = "N"), size=15, family="Roboto") +
   geom_text(aes(x="55",y=120, label = "Health"),angle=60, size=8, family="Roboto") +
   #scale_x_continuous(breaks = c(13,24, 33,43,53,62,74,82,93),
   #                   labels = c("I","II", "III","VI","V","VI","VII","VIII","XI")
   #                   ) +
-    annotate("text", 
-             x = rep(max(0,.4),4), 
-             y = c(10, 30, 50, 70), 
-             label = c("10", "30", "50", "70") , 
-             color="white", 
-             size=3 , 
-             angle=0, 
-             fontface="bold", 
-             hjust=1)+
+  annotate("text", 
+           x = rep(max(0,.4),4), 
+           y = c(10, 30, 50, 70), 
+           label = c("10", "30", "50", "70") , 
+           color="white", 
+           size=3 , 
+           angle=0, 
+           fontface="bold", 
+           hjust=1)+
   # inner horizontal segment
   geom_segment(aes(x = 0,
                    xend = 45,
                    y = -1,
                    yend = -1),
                color = "grey") +
-    geom_segment(
-      data = ocdat,
-      aes(x =x,
-                   xend = xend,
-                   y = y,
-                   yend = yend),
-               color = "steelblue",
-               size = 5) +
- geomtextpath::geom_textpath(data = ocdat, 
-                             aes(x=x,y=y,label=label),
-                            vjust = 5,
-                             hjust = 1) +
+  # lines for aggregated occupations (sex)
+  geom_segment(
+    data = ocdat,
+    aes(x =x,
+        xend = xend,
+        y = y,
+        yend = yend),
+    color = "steelblue",
+    size = 5) +
+  # lines for women in aggregated occupations
+  geom_segment(
+    data = ocdat,
+    aes(x =x,
+        xend = xend2_sex,
+        y = y,
+        yend = yend),
+    color = "black",
+    size = 5,
+    alpha = 0.4) +
+  # lines for aggregated occupations (edu)
+  geom_segment(
+    data = ocdat,
+    aes(x =x,
+        xend = xend,
+        y = y2,
+        yend = yend2),
+    color = "steelblue",
+    size = 5) +
+  # lines for low education in aggregated occupations
+  geom_segment(
+    data = ocdat,
+    aes(x =x,
+        xend = xend2_edu,
+        y = y2,
+        yend = yend2),
+    color = "black",
+    size = 5,
+    alpha = 0.4) +
+  geomtextpath::geom_textpath(data = ocdat, 
+                              aes(x=x,y=y,label=label),
+                              vjust = 5,
+                              hjust = 1) +
   geomtextpath::coord_curvedpolar(clip="off") +
   ylim(-30,120)
-  
+
 
 
 ```
