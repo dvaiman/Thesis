@@ -42,31 +42,36 @@ theme_update(
 
 ```{r}
 df <- df_sl_pat_dor2 |> 
-  mutate(sex = if_else(Gender == "Female",1,0)) |> 
+  mutate(sex = if_else(Gender == "Female",1,0),
+         obesity=if_else(BMI>=30, 1,0),
+         overweight=if_else(BMI>=25, 1,0),
+         lowcrf=if_else(Astrand_rel_VO2<32, 1,0)) |> 
   group_by(Ssyk2_hpi_scb_combined, 
            Ssyk12_hpi_scb_combined,
            Ssyk_hpi_scb_wb_hl,
            Ssyk1_hpi_scb_combined,
            Ssyk12_name) |> 
-  summarise(maxBMI = max(BMI), minBMI = min(BMI), BMI = mean(BMI),  
-            maxCRF = max(Astrand_rel_VO2), minCRF = min(Astrand_rel_VO2), CRF = mean(Astrand_rel_VO2), 
+  summarise(maxBMI = max(BMI), minBMI = min(BMI), BMI = mean(BMI), obesity = mean(obesity)*100,overweight = mean(overweight)*100,
+            maxCRF = max(Astrand_rel_VO2), minCRF = min(Astrand_rel_VO2), CRF = mean(Astrand_rel_VO2), lowcrf = mean(lowcrf)*100,
             maxAge = max(Age), minAge = min(Age), Age = mean(Age),
-            smoking = mean(TobaccoSmoking),
+            smoking = mean(TobaccoSmoking_cat)*100,
+          #  smoking = if_else(TobaccoSmoking)
             sex = mean(sex)*100,
             n = n()/100) |> 
   mutate(ssyk1_name = case_when(
     Ssyk1_hpi_scb_combined == 2 ~ "2 Professionals",
                    Ssyk1_hpi_scb_combined == 8 ~ "8 Transport and mechanical manufacturing",
-                   TRUE ~ Ssyk12_name)
+                   TRUE ~ Ssyk12_name),
+    ssyk2_label = Ssyk2_hpi_scb_combined
     )
 
 
 
-  # data for aggregating lines
+  # data for aggregating segments
   ocdat = 
     data.frame(
-    x = c(1, 22, 32, 42),
-    xend = c(20,30,40,50),
+    x = c(.5, 21.5, 31.5, 41.5),
+    xend = c(20.5,30.5,40.5,50.5),
     y =    rep(88,4), 
     yend = rep(88,4), 
     label = c("White-collar high-skilled", 
@@ -91,6 +96,36 @@ df <- df_sl_pat_dor2 |>
            diff_attributed_to_education = diff*education,
            xend2_edu = x+diff_attributed_to_education)
   
+   # data for  segments
+  ocdat9 = 
+    data.frame(
+    x = c(.5, 8.5, 15.5, 21.5, 26.5, 31.5, 34.5, 41.5, 45.5),
+    xend = c(7.5, 14.5, 20.5, 25.5 ,30.5 ,33.5, 40.5, 44.5, 50.5),
+    y =    rep(68,9), 
+    yend = rep(68,9), 
+    Ssyk1_hpi_scb_combined = seq(1,9),
+    y2 = rep(58,9), 
+    yend2 = rep(58,9) 
+  ) |> 
+    left_join(
+      df_sl_pat_dor2 |> 
+        mutate(sex = if_else(Gender == "Female",1,0),
+               education = SUN2000Niva_Old <= 4, 1,0,
+               ssyk1_name = case_when(
+    Ssyk1_hpi_scb_combined == 2 ~ "2 Professionals",
+                   Ssyk1_hpi_scb_combined == 8 ~ "8 Transport and mechanical manufacturing",
+                   TRUE ~ Ssyk12_name)) |> 
+        group_by(ssyk1_name, Ssyk1_hpi_scb_combined) |> 
+        summarise(sex = mean(sex),
+                  education = mean(education))#,
+    #  by = c("label" = "Ssyk_hpi_scb_wb_hl")
+      ) |> 
+    mutate(diff = xend-x,
+           diff_attributed_to_women = diff*sex,
+           xend2_sex = x+diff_attributed_to_women,
+           diff_attributed_to_education = diff*education,
+           xend2_edu = x+diff_attributed_to_education)
+  
   
   # data for aggregating more lines
   df_sl_pat_dor2 |> 
@@ -98,10 +133,19 @@ df <- df_sl_pat_dor2 |>
     group_by(Ssyk1_hpi_scb_combined) |> 
     summarise(sex = mean(sex)*100) 
   
-  
+  seq(1,9)
   df |> 
     group_by(Ssyk1_hpi_scb_combined) |> 
     summarise(sex = mean(sex))
+  
+  
+ labels =  data.frame(
+    label = c("Smokers (%)", "Obesity (%)", "Low cardiorespiratory fitness (%)", "Mean age", "Women (%)", "High education (%)", "Women (%)", "High education (%)"),
+    yposition = c(-5,10,25,45,60,70,80,90),
+    xposition = rep(-16,8)
+  )
+  
+  
 ```
 seeing
 imagining
@@ -113,8 +157,8 @@ describing
 df |> 
   # space between bars
   bind_rows(
-    data.frame(Ssyk2_hpi_scb_combined = c(18,27,36,45, 55,63, 77, 84,97),
-               lines = as.factor(c(18,27,36,45, 55,63, 77, 84,97))
+    data.frame(Ssyk2_hpi_scb_combined = c(18,27,36,45, 55,63, 77, 84),
+               lines = as.factor(c(18,27,36,45, 55,63, 77, 84))
     ),
     data.frame(lines2 = as.factor(c(36, 55, 77,97))
     )) |> 
@@ -126,34 +170,41 @@ df |>
              size=4,
              #position = position_nudge(0,5)
   ) +
+  # making gap in circle
+  geom_point(aes(x=-15,y=4)) +
   geom_segment(aes(x = lines,
                    xend = lines,
-                   y = 40,
-                   yend = 80),
+                   y = 30,
+                   yend = 110),
                linetype = "dotted",
-               color = "white") +
+            size = 2,
+               color = "grey20",
+               arrow = arrow(length = unit(0.015, "npc"))
+            ) +
   geom_segment(aes(x = lines2,
                    xend = lines2,
-                   y = 40,
-                   yend = 100),
+                   y = 30,
+                   yend = 110),
                linetype = "dotted",
-               color = "black",
-               arrow = arrow(length = unit(0.03, "npc"))
-  )+
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=BMI)) + 
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=CRF), fill="gold", alpha=0.3) +
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=smoking), fill="gold4", alpha=0.9) +
-  geomtextpath::geom_textpath(aes(y=98, label = Ssyk2_hpi_scb_combined), color = "black") +
-  geom_text(aes(x="97",y=115, label = "N"), size=15, family="Roboto") +
-  geom_text(aes(x="55",y=120, label = "Health"),angle=60, size=8, family="Roboto") +
+            size=2,
+             color = "gold3",
+            alpha = 1,
+               arrow = arrow(length = unit(0.015, "npc"))
+  ) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=obesity)) + 
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=lowcrf), fill="gold", alpha=0.55) +
+ # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=-smoking*sign(smoking)), fill="gold4", alpha=0.6) +
+  geomtextpath::geom_textpath(aes(y=98, label = ssyk2_label), color = "black") +
+ # geom_text(aes(x="97",y=115, label = "N"), size=15, family="Roboto") +
+ # geom_text(aes(x="55",y=120, label = "Health"),angle=60, size=8, family="Roboto") +
   #scale_x_continuous(breaks = c(13,24, 33,43,53,62,74,82,93),
   #                   labels = c("I","II", "III","VI","V","VI","VII","VIII","XI")
   #                   ) +
   annotate("text", 
-           x = rep(max(0,.4),4), 
-           y = c(10, 30, 50, 70), 
-           label = c("10", "30", "50", "70") , 
+           x = rep(max(0,.3),3), 
+           y = c(10, 30, 50), 
+           label = c("10", "30", "50") , 
            color="white", 
            size=3 , 
            angle=0, 
@@ -172,8 +223,8 @@ df |>
         xend = xend,
         y = y,
         yend = yend),
-    color = "steelblue",
-    size = 5) +
+    color = colorspace::lighten("steelblue",0),
+    size = 3) +
   # lines for women in aggregated occupations
   geom_segment(
     data = ocdat,
@@ -182,7 +233,7 @@ df |>
         y = y,
         yend = yend),
     color = "black",
-    size = 5,
+    size = 3,
     alpha = 0.4) +
   # lines for aggregated occupations (edu)
   geom_segment(
@@ -191,8 +242,8 @@ df |>
         xend = xend,
         y = y2,
         yend = yend2),
-    color = "steelblue",
-    size = 5) +
+    color = colorspace::lighten("steelblue",0),
+    size = 3) +
   # lines for low education in aggregated occupations
   geom_segment(
     data = ocdat,
@@ -201,14 +252,82 @@ df |>
         y = y2,
         yend = yend2),
     color = "black",
-    size = 5,
+    size = 3,
     alpha = 0.4) +
+   # lines for 9 occupations (sex)
+  geom_segment(
+    data = ocdat9,
+    aes(x =x,
+        xend = xend,
+        y = y,
+        yend = yend),
+    color = "steelblue",
+    size = 3) +
+  # lines for women in 9 occupations
+  geom_segment(
+    data = ocdat9,
+    aes(x =x,
+        xend = xend2_sex,
+        y = y,
+        yend = yend),
+    color = "black",
+    size = 3,
+    alpha = 0.4) +
+   # lines for 9 occupations (edu)
+  geom_segment(
+    data = ocdat9,
+    aes(x =x,
+        xend = xend,
+        y = y2,
+        yend = yend2),
+    color = colorspace::darken("steelblue",0),
+    size = 3) +
+  # lines for low education in 9 occupations
+  geom_segment(
+    data = ocdat9,
+    aes(x =x,
+        xend = xend2_edu,
+        y = y2,
+        yend = yend2),
+    color = "black",
+    size = 3,
+    alpha = 0.4) +
+  # text labels
+  geom_text(data = labels, 
+                              aes(x=xposition,y=yposition,
+                                  label=label),
+            hjust=0,
+            color = "grey20") +
+ 
+#  geom_path(data =  data.frame(
+#  y = seq(from = -10, to= 0, length.out = 70),
+#  x =  seq(from = -10, to= 0, length.out = 70)
+  
+#) |> 
+#  expand.grid() |> 
+ # mutate(x1 = x + gen_simplex(x, y) / 2),
+#aes(x1,y, group = x))  +
+  
+  # occupation texts
+ # geomtextpath::geom_textpath(data = ocdat9, 
+ #                             aes(x=x,y=y+30,
+ #                                 label=ssyk1_name),
+ #                             vjust = 5,
+ #                             hjust = 1) +
+  geom_text(data = ocdat9, 
+                              aes(x=x,y=y+30,
+                                  label=ssyk1_name),
+                              vjust = 5,
+                              hjust = 0,
+            angle = c(80,30,0,330,290,250,210, 170,130),
+            vjust=0) +
   geomtextpath::geom_textpath(data = ocdat, 
                               aes(x=x,y=y,label=label),
                               vjust = 5,
-                              hjust = 1) +
+                              hjust = 1,
+                             color="black") +
   geomtextpath::coord_curvedpolar(clip="off") +
-  ylim(-30,120)
+  ylim(-50,140)
 
 
 
@@ -303,3 +422,15 @@ ggraph(layout = 'linear', circular = TRUE) +
   
   ggsave(here::here("accidentalart.svg"))
 ```
+
+
+```{r}
+mtcars |> distinct(mpg, .keep_all = TRUE) |> 
+  ggplot(aes(mpg, drat)) +
+  
+ # geom_polygon() +
+  ggvoronoi::geom_voronoi() +
+ # ggforce::geom_voronoi_tile() +
+geom_point(color = "red") 
+```
+
