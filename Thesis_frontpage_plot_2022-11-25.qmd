@@ -90,7 +90,8 @@ df <- df_sl_pat_dor2 |>
   ocdat = 
     data.frame(
     x = c(.5, 21.5, 31.5, 41.5),
-    x2 = c(6, 21.5, 31.5, 41.5),
+    # for labels postion
+    x2 = c(7, 23, 32.5, 42.5),
     xend = c(20.5,30.5,40.5,50.5),
     y =    rep(88,4), 
     yend = rep(88,4), 
@@ -175,6 +176,16 @@ d = data.frame(         x = as.factor(rep(c(18,27,36,45, 55,77,84), times=4)),
            y = rep(c(10, 30, 50, 60),each=7), 
            label = rep(c("10", "30", "50", "*", "*","",""),each=4)
 )
+
+
+
+
+da = data.frame(
+  x = rep(0.5,6),
+                    xend = rep(50.5,6),
+                   y =    c(-50, -30, -10, 10, 30, 50),
+                   yend = c(-50, -30, -10, 10, 30, 50)
+)
 ```
 
 # plot
@@ -224,12 +235,25 @@ mutate( Ssyk2_color = as.character(rep(1:2, 27))) |>
   #           alpha = 1,
   #          #    arrow = arrow(length = unit(0.015, "npc"))
   # ) +
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=obesity)) + 
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=lowcrf), fill="gold", alpha=0.55) +
- # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
+# gridlines
+     geom_segment(
+    data = da,
+    aes(x =x,
+        xend = xend,
+        y = y,
+        yend = yend),
+    color = "grey70",
+    size = 0.4,
+    linetype = "dotted") +
+  
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=lowcrf), fill="gold3", alpha=1) +
+ geom_col(aes(x=Ssyk2_hpi_scb_combined , y=obesity), fill = "grey30") + 
+  # geom_col(aes(x=Ssyk2_hpi_scb_combined , y=Age), fill="gold", alpha=0.3) +
 #  geom_segment(aes(x=Ssyk2_hpi_scb_combined , y=-smoking*sign(smoking), xend=Ssyk2_hpi_scb_combined, yend=-5), fill="gold4", alpha=0.6) +
-         geom_col(aes(x=Ssyk2_hpi_scb_combined , y=-pws*sign(smoking)), fill="gold4", alpha=0.7) + 
-  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=-smoking*sign(smoking)), fill="yellow", alpha=0.4) +
+
+   geom_col(aes(x=Ssyk2_hpi_scb_combined , y=-pws*sign(pws)), fill=colorspace::darken("gold3",0), alpha=1) + 
+  geom_col(aes(x=Ssyk2_hpi_scb_combined , y=-smoking*sign(smoking)), fill=colorspace::darken("grey30",0), alpha=1) +     
+
 
 
   geomtextpath::geom_textpath(aes(y=98, label = ssyk2_label, color = Ssyk2_color)) +
@@ -238,31 +262,21 @@ mutate( Ssyk2_color = as.character(rep(1:2, 27))) |>
   #scale_x_continuous(breaks = c(13,24, 33,43,53,62,74,82,93),
   #                   labels = c("I","II", "III","VI","V","VI","VII","VIII","XI")
   #                   ) +
-  # text for percentage labels
-      annotate(
-        "text", 
-           x = as.factor(rep(c(18,27,36,45, 55,77,84),times=4)), 
-           y = rep(c(10, 30, 50, 60),each=7), 
-           label = rep(c("*", "*", "*", "*", "2","1","9"),each=4), 
-           color="grey60", 
-           size=3 , 
-           #angle=0, 
-           fontface="bold", 
-           hjust=.5) +
+
   annotate("text", 
-           x = rep(max(0,.2),4), 
-           y = c(10, 30, 50, 60), 
-           label = c("10", "30", "50", "%") , 
-           color="grey60", 
+           x = rep(max(0,.2),8), 
+           y = c(-62,-50, -30, -10,10, 30, 50, 62), 
+           label = c("%", "50","30", "10", "10", "30", "50", "%") , 
+           color="grey70", 
            size=3 , 
            angle=0, 
            fontface="bold", 
-           hjust=1) +
-  # inner horizontal segment
-  geom_segment(aes(x = 0,
+           hjust=.5) +
+     # inner horizontal segment
+  geom_segment(aes(x = 0.5,
                    xend = 50.5,
-                   y = -1,
-                   yend = -1),
+                   y = -0,
+                   yend = -0),
                size=0.2,
                color = "white") +
   # lines for aggregated occupations (sex)
@@ -348,6 +362,7 @@ mutate( Ssyk2_color = as.character(rep(1:2, 27))) |>
             hjust=0,
             family = "Lato",
             color = colorspace::darken("steelblue",0.5)) +
+
  
 #  geom_path(data =  data.frame(
 #  y = seq(from = -10, to= 0, length.out = 70),
@@ -395,15 +410,17 @@ mutate( Ssyk2_color = as.character(rep(1:2, 27))) |>
  # ggrepel::geom_text_repel(data = ocdat9, 
   #                            aes(x=x,y=y+30,
    #                               label=ssyk1_name)) +
-  ylim(-100,120)
+  ylim(-90,120)
 
 
 ocdat9 |>  view()
 ```
 
 ```{r}
+ggsave("fronpageplot2.svg")
+#Saving 7.93 x 11.9 in image
 
-ggsave("fronpageplot.svg")
+#ggsave("fronpageplot.svg")
 #Saving 8.3 x 11.9 in image
 ```
 
