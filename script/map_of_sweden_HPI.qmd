@@ -1,0 +1,388 @@
+---
+title: "map"
+format: html
+editor: visual
+---
+
+links
+
+https://github.com/reinholdsson/swemaps
+
+https://nbisweden.github.io/Workshop_geneco_2020_05/docs/lab_ggmap.html
+
+https://discuss.analyticsvidhya.com/t/mapping-postal-codes-on-country-map-using-r/5774
+
+https://www.eea.europa.eu/data-and-maps/data/eea-reference-grids-2/gis-files/sweden-shapefile
+
+https://postal-codes.cybo.com/sweden/#listcodes
+
+shapefiler
+
+https://www.esri.se/arcgis-bloggen/2021/05/04/hitta-och-anvand-oppna-geodata/
+
+https://www.scb.se/hitta-statistik/regional-statistik-och-kartor/regionala-indelningar/digitala-granser/
+
+https://www.lantmateriet.se/sv/Kartor-och-geografisk-information/oppna-data/
+
+finish map package
+
+https://ropengov.org/2020/02/geofi-en/
+
+hexagons
+
+https://www.robert-hickman.eu/post/getis-ord-heatmaps-tutorial/
+
+ggrepel
+
+https://r-spatial.org/r/2018/10/25/ggplot2-sf-2.html
+
+```{r}
+library(tidyverse)
+library(sf)
+library(ragg)
+```
+
+```{r}
+#hpb <- read_csv(here::here("Data", "data2020", "rensad data 2020_scb_dor_patreg_fk", "data", "hbt_scb_cleaned_data_all_longformat_2021-05-21.csv"))
+
+
+hpb <- read_csv("../../../Other_R_projects/HPI/Data/data2020/rensad data 2020_scb_dor_patreg_fk/data/hbt_scb_cleaned_data_all_longformat_2021-05-21.csv", 
+                           locale = readr::locale(encoding = "UTF-8"))
+```
+
+## check n for figure text
+
+```{r}
+hpb |> 
+  mutate(year = lubridate::year(Performed)) |> 
+  filter(Kommun >=1) |> 
+  select(year) |> 
+  arrange(desc(year))
+```
+
+```{r}
+kn <- hpb %>% 
+  select(TopLocation, Location, Kommun) %>% 
+  #filter(TopLocation == 16868) %>% 
+  count(Kommun) 
+
+
+
+```
+
+```{r}
+
+
+# swe <- st_read(here::here("mapofsweden", "mapfiles", "shape_svenska_210505", "FAregionSweref99TM",  "FAregion_Sweref99TM_region.shp"))
+
+# swe <- st_read(here::here("mapofsweden", "mapfiles", "shape_svenska_210505", "LAregion_2018_Sweref99TM",  "LAomraden_2018_region.shp"))
+
+swe <- st_read(here::here("mapfiles", "shape_svenska_210505", "KommunSweref99TM",  "Kommun_Sweref99TM_region.shp"))
+
+
+
+swe <- swe %>% 
+  left_join(
+    kn, by = c("KnKod" = "Kommun")
+  )  |>
+  # replacing ÅÄÖ
+  mutate(municipalities  = str_replace_all(KnNamn, "[ÅÄÖ]", "A") %>% str_replace_all("[åäö]", "a"))
+
+# making center of kommun and extracting lat long
+swe1 <- swe %>% 
+  sf::st_centroid() %>% 
+dplyr::mutate(lon = sf::st_coordinates(.)[,1],
+                lat = sf::st_coordinates(.)[,2]) %>% 
+  mutate(KnNamn2 = if_else(n > 10000, KnNamn, NA_character_))
+
+swe %>% as.data.frame() %>%  select(KnKod, KnNamn, n) %>% arrange(desc(n))
+
+
+ggplot(swe) +
+  stat_sf_coordinates()
+
+#p1 <- 
+  ggplot() +  
+  # geom_sf(data=swe, aes(geometry = geometry, size = n)) +
+  geom_sf(data=swe, aes(fill = n), color = "transparent") +
+ # geom_sf_text(data=swe, aes(label = KnNamn), 
+ #              colour = "white",
+ #              check_overlap = TRUE,
+ #              label.padding = 1) +
+   ggrepel::geom_text_repel(data = swe1, aes(x = lon, y = lat, label = KnNamn2), 
+  fontface = "bold", 
+  nudge_x = c(0.25), 
+  nudge_y = c(0.25),
+  color = "grey10",
+  family = "Roboto Condensed"
+) +
+ # geom_segment(data = swe1, aes(x = lon, y = lat, xend = 907982, yend = lat)) +
+#  stat_sf_coordinates(data=swe,) +
+    scale_fill_viridis_c(option = "viridis",  # viridis, cividis, magma, inferno plasma
+                         direction = 1,
+                         begin = .3,
+                         end = 1,
+                         trans ="sqrt", #  "log", #scales::pseudo_log_trans(sigma = 10), #sqrt, 
+                         alpha = .9,
+                         breaks = c(1000, 5000, 10000, 60000)) +
+  coord_sf(clip = "off") + # datum = NA
+  #labs(title = "Antal utförda hälsoprofilbedömningar") +
+  guides(fill = guide_legend(title = "",
+                             title.position = "bottom",
+                             reverse = TRUE,
+                             title.theme =element_text(size = 10,
+                                                       face = "bold",
+                                                       colour = "gray70",
+                                                       angle = 0))) +
+  theme_void(base_family = "Roboto Condensed") +
+  theme(plot.title.position="plot",
+        
+        legend.position = c(0.9, 0.48),
+        plot.background = element_rect(color = "white", fill = "white"))
+
+ggsave("hpisverige2.png", dpi = 400)
+
+
+
+# geom point
+ggplot() +  
+ # geom_segment(data = swe1, aes(x = lon, y = lat, xend = 907982, yend = lat)) +
+# stat_sf_coordinates(data=swe, alpha = 0.5) +
+  geom_point(data=swe1, alpha = 0.5, aes(x = lon, y = lat, size = n, color = n)) +
+  scale_size(range = c(2, 20)) +
+    scale_color_viridis_c(option = "viridis",  # viridis, cividis, magma, inferno plasma
+                         direction = 1,
+                         begin = .2,
+                         end = 1,
+                         trans = "sqrt", 
+                         alpha = .9,
+                         breaks = c(2000, 10000, 60000)) +
+  coord_sf(clip = "off") + # datum = NA
+ guides(color = guide_legend(title = "Unit: 1000", title.position = "bottom", title.theme =element_text(size = 10, face = "bold",colour = "gray70",angle = 0))) +
+  theme_void(base_family = "Roboto Condensed") +
+  theme(plot.title.position="plot",
+        legend.position = c(0.9, 0.5),
+        plot.background = element_rect(color = "white", fill = "white"))
+
+
+
+
+   ggrepel::geom_text_repel(data = swe1, aes(x = lon, y = lat, label = KnNamn2), 
+  fontface = "bold", 
+  nudge_x = c(707982, 500000, -500000, 500000, -500000), 
+  nudge_y = c(0.25),
+  color = "grey10",
+  family = "Roboto Condensed"
+) 
+   
+   
+      ggrepel::geom_text_repel(data = swe1, aes(x = lon, y = lat, label = KnNamn2), 
+    seed         = 42,
+    force        = 20,
+    force_pull   = 50,
+    nudge_x      = 10,
+    direction    = "x",
+    hjust        = 0,
+    segment.size = 0.2,
+    box.padding  = 0.2) 
+```
+
+# Rayshader
+
+https://michaelpaulschramm.com/posts/2021-04-15-rayshade-precipitation/
+
+https://www.gavinrozzi.com/project/njpopulationdensitymap/
+
+https://github.com/Pecners/kontur_rayshader_tutorial/blob/main/main.R
+
+https://www.youtube.com/watch?v=zgFXVhmKNbU `render_camera()` to programmatically change the camera position,
+
+`render_snapshot()` to save or output the current view,
+
+or even use `render_depth()` to render a slick depth of field effect
+
+```{r}
+library(rayshader)
+
+
+remotes:: install_version("ggplot2", version = "3.3.6", repos = "http://cran.us.r-project.org")
+
+
+
+p1 <- ggplot() +  
+  # geom_sf(data=swe, aes(geometry = geometry, size = n)) +
+  geom_sf(data=swe, aes(fill = n), color = "black") + # transparent
+ # geom_sf_text(data=swe, aes(label = KnNamn), 
+ #              colour = "white",
+ #              check_overlap = TRUE,
+ #              label.padding = 1) +
+#    ggrepel::geom_text_repel(data = swe1, aes(x = lon, y = lat, label = KnNamn2), 
+#   fontface = "bold", 
+#   nudge_x = c(0.25), 
+#   nudge_y = c(0.25),
+#   color = "grey10",
+#   family = "Roboto Condensed"
+# ) +
+ # geom_segment(data = swe1, aes(x = lon, y = lat, xend = 907982, yend = lat)) +
+#  stat_sf_coordinates(data=swe,) +
+    scale_fill_viridis_c(option = "viridis",  # viridis, cividis, magma, inferno plasma
+                         direction = 1,
+                         begin = 0.3,
+                         end = 1,
+                       #  trans ="log", #  "log", #scales::pseudo_log_trans(sigma = 10), #sqrt, 
+                         alpha = 1,
+                         breaks = c(1000,10000, 70000)) +
+  coord_sf(clip = "off") + # datum = NA
+  #labs(title = "Antal utförda hälsoprofilbedömningar") +
+  guides(fill = guide_legend(title = "", #  guide_colourbar
+                             title.position = "bottom",
+                             direction = "vertical",
+                             reverse = TRUE,
+                             label.hjust = .5,
+      label.vjust = .5, 
+      label.theme = element_text(angle = 0, size=6),
+                             title.theme =element_text(size = 8,
+                                                       face = "bold",
+                                                       colour = "gray70",
+                                                       angle = 90))) +
+  theme_void(base_family = "Roboto Condensed") +
+   theme(text = element_text(family = "Source Sans Pro"),
+      #  legend.position = "top",
+      legend.position = c(0.9, 0.48),
+      #  legend.title = element_text(size = 8),
+        legend.text = element_text(size = 3),
+      legend.key.height = unit(0.5, "cm"),
+      legend.key.width = unit(.45, "cm"),
+     
+       # legend.key.height = unit(0.9, "cm"),
+        panel.background = element_rect(fill = "white", color = "white"),
+       plot.background = element_rect(color = "white", fill = "white"),
+       # panel.grid = element_line(color = "grey10",
+       #                           size = .1),
+       # axis.title.x = element_text(size = 6, hjust = 0),
+       # axis.title.y = element_text(size = 6, hjust = 0),
+       # axis.text.x = element_text(size = 6),
+       # axis.text.y = element_text(size = 6),
+        axis.ticks.x = element_blank(),
+     plot.margin = margin(t = 200, r = 200, b = 200, l = 200, unit = "pt"),
+        axis.ticks.y = element_blank()) 
+
+  # theme(plot.title.position="plot",
+  #       
+  #       legend.position = c(0.05, 0.8),
+  #       plot.background = element_rect(color = "white", fill = "white"))
+
+
+## make 3D ggplot
+plot_gg(p1, 
+        multicore = TRUE, 
+        width = 8, 
+        height = 10,
+        solidcolor = "white",
+        #theta = 0,phi = 80, fov = 0,
+        scale = 350,
+        offset_edges = TRUE,
+        zoom = .5,
+        flat_transparent_bg = true,
+        sunangle = 205, # higher more to the "right"
+        sunaltitude = 200, # 45 is default
+        background = "grey90",
+        windowsize = c(800,1080))
+
+render_snapshot() 
+
+
+ 
+    
+## brrrrrr
+render_highquality("njdensity_4.png",
+                   lightdirection = 45, # 45 150 190
+                   lightaltitude = 60,
+                   lightintensity = 1000,
+                   samples = 4000, #lower this to get faster rendering
+                 #  sample_method = "sobol",
+                   parallel = TRUE,
+                   width = 800,
+                   height = 1080,
+                   interactive = FALSE,
+                   ground_material = rayrender::diffuse(color = "grey40"),
+                   clear = TRUE)
+
+
+
+plot_gg(p1, multicore = TRUE, width = 6 ,height=2.7, fov = 70)
+
+plot_gg(p1, width = 3, height = 4, scale = 200, multicore = TRUE)
+
+render_label(montereybay, x = 220, y = 70, z = 7000, zscale = 50,
+             text = "Santa Cruz", textcolor = "darkred", linecolor = "darkred",
+             textsize = 2, linewidth = 5)
+
+plot_gg(p1, multicore = TRUE, width = 2 ,height=1.5, scale=300, fov = 50, zoom=0.5)
+
+render_depth(focallength=100,focus=0.72)
+
+render_highquality(samples=256, line_radius = 1, text_size = 18, text_offset = c(0,12,0),
+                   clamp_value=10, clear = TRUE)
+
+
+
+```
+
+# Making histogram count per year
+
+to attach with map
+
+```{r}
+
+glimpse(hpb)
+
+p2 <- hpb |> 
+  filter(lubridate::year(Performed) >= 1990) |> 
+  mutate(HPB = if_else(is.na(HPB),"Fitness test","HPB")) |> 
+  ggplot(
+    aes(lubridate::year(Performed), 
+        color = HPB
+        )
+         ) +
+  geom_histogram(bins=31,
+                 binwidth = 0.5
+                 ) +
+  theme_minimal()
+
+
+p3 <- hpb |> 
+  filter(lubridate::year(Performed) >= 1990) |> 
+  mutate(HPB = if_else(is.na(HPB),"Fitness test","HPB")) |> 
+  ggplot(
+    aes(lubridate::year(Performed), 
+        color = Ssyk_hpi_scb_wb_hl
+        )
+         ) +
+  geom_histogram(bins=31,
+                 binwidth = 0.5
+                 ) +
+  theme_minimal()
+
+
+p4 <- hpb |> 
+  filter(lubridate::year(Performed) >= 1990) |> 
+  mutate(HPB = if_else(is.na(HPB),"Fitness test","HPB")) |> 
+  ggplot(
+    aes(lubridate::year(Performed), 
+        color = Gender
+        )
+         ) +
+  geom_histogram(bins=31,
+                 binwidth = 0.5
+                 ) +
+  theme_minimal()
+
+```
+
+```{r}
+library(patchwork)
+
+p1 + p2 / p3 / p4 + 
+  plot_layout(widths = c(1.5, 1))
+```
